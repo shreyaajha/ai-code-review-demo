@@ -1,4 +1,4 @@
-password="admin123"
+password = "mentor_demo_123"
 
 def add_numbers(a, b):
     """
