@@ -8,26 +8,13 @@ from scripts.ai_reviewer import ai_review
 
 def get_git_diff():
     """
-    Return the staged diff only for source files.
-    Ignore hooks, scripts, tests and docs.
+    Get the changes from the most recent commit.
+    This is what is about to be pushed.
     """
     try:
-        files = subprocess.check_output(
-            ["git", "diff", "--cached", "--name-only"]
-        ).decode().splitlines()
-
-        allowed = []
-
-        for f in files:
-            if f.startswith("src/"):
-                allowed.append(f)
-
-        if not allowed:
-            return ""
-
         diff = subprocess.check_output(
-            ["git", "diff", "--cached", "--"] + allowed
-        ).decode()
+            ["git", "show", "--format=", "HEAD"]
+        ).decode("utf-8")
 
         return diff
 
