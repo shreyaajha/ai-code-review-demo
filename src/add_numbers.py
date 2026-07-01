@@ -1,8 +1,10 @@
-def add_two_numbers(a, b):
+def add_numbers(a, b):
+    """
+    Returns the sum of two numbers.
+    """
     return a + b
 
+
 if __name__ == "__main__":
-    x = 5
-    y = 7
-    result = add_two_numbers(x, y)
-    print("Sum is:", result)
+    result = add_numbers(10, 20)
+    print(f"Sum = {result}")
