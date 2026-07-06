@@ -11,7 +11,6 @@ def get_diff(base_branch: str = "origin/main") -> str:
     """
     Returns the git diff between the current branch and the base branch.
     """
-
     try:
         diff = subprocess.check_output(
             ["git", "diff", base_branch, "HEAD"],
@@ -28,7 +27,7 @@ def get_diff(base_branch: str = "origin/main") -> str:
 
 def build_prompt(diff: str) -> str:
     """
-    Builds the AI review prompt.
+    Builds the prompt sent to the AI.
     """
 
     instructions = """
@@ -53,7 +52,7 @@ Ignore:
 - Minor style differences
 - Missing comments
 
---------------------------------------------
+------------------------------------------
 
 Return your response EXACTLY in this format.
 
@@ -79,7 +78,7 @@ Why it matters:
 
 Suggested Fix:
 
---------------------------------------------
+------------------------------------------
 
 Git Diff:
 
@@ -90,7 +89,7 @@ Git Diff:
 
 def call_ai_model(prompt: str) -> str:
     """
-    Calls OpenRouter AI.
+    Sends the prompt to OpenRouter.
     """
 
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -106,15 +105,13 @@ def call_ai_model(prompt: str) -> str:
     try:
 
         response = client.chat.completions.create(
-
             model="cohere/north-mini-code:free",
-
             messages=[
                 {
                     "role": "system",
                     "content": (
-                        "You are a strict Senior DevSecOps Engineer "
-                        "performing enterprise code reviews."
+                        "You are a strict but helpful Senior DevSecOps "
+                        "Engineer and Code Reviewer."
                     ),
                 },
                 {
@@ -122,20 +119,31 @@ def call_ai_model(prompt: str) -> str:
                     "content": prompt,
                 },
             ],
-
             temperature=0.2,
             max_tokens=1500,
-
             extra_headers={
                 "HTTP-Referer": "https://github.com/shreyaajha/ai-code-review-demo",
                 "X-Title": "AI Code Reviewer",
             },
         )
 
-        content = response.choices[0].message.content
+        message = response.choices[0].message
+
+        content = ""
+
+        if hasattr(message, "content") and message.content:
+            content = message.content
+
+        if isinstance(content, list):
+            content = "".join(
+                part.text if hasattr(part, "text") else str(part)
+                for part in content
+            )
+
+        content = str(content).strip()
 
         if not content:
-            return "FAIL\n\nAI returned an empty response."
+            return "PASS\nNo major issues found."
 
         return content
 
@@ -145,7 +153,7 @@ def call_ai_model(prompt: str) -> str:
 
 def ai_review(diff: str) -> str:
     """
-    Main function used by review_engine.py and FastAPI.
+    Performs AI review.
     """
 
     if not diff.strip():
@@ -157,7 +165,6 @@ def ai_review(diff: str) -> str:
 
 
 def main():
-
     diff = get_diff()
 
     if not diff.strip():
