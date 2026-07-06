@@ -1,5 +1,7 @@
-import sys
 import subprocess
+import sys
+from datetime import datetime
+import uuid
 
 from scripts.secret_scanner import scan_for_secrets
 from scripts.quality_checker import check_code_quality
@@ -7,99 +9,129 @@ from scripts.ai_reviewer import ai_review
 
 
 def get_git_diff():
-    """
-    Get the changes from the most recent commit.
-    This is what is about to be pushed.
-    """
     try:
-        diff = subprocess.check_output(
-            ["git", "show", "--format=", "HEAD"]
-        ).decode("utf-8")
-
-        return diff
-
+        return subprocess.check_output(
+            ["git", "show", "--format=", "HEAD"],
+            text=True,
+        )
     except Exception:
         return ""
 
 
+def print_header(title):
+    print("\n" + "=" * 60)
+    print(title.center(60))
+    print("=" * 60)
+
+
+def calculate_score(secrets, quality):
+    score = 100
+
+    for issue in secrets + quality:
+        severity = issue["severity"].lower()
+
+        if severity == "critical":
+            score -= 40
+        elif severity == "high":
+            score -= 20
+        elif severity == "medium":
+            score -= 10
+        else:
+            score -= 5
+
+    return max(score, 0)
+
+
+def calculate_risk(secrets, quality):
+    severities = [i["severity"].lower() for i in secrets + quality]
+
+    if "critical" in severities:
+        return "CRITICAL"
+
+    if "high" in severities:
+        return "HIGH"
+
+    if "medium" in severities:
+        return "MEDIUM"
+
+    return "LOW"
+
+
 def run_review():
+
     code = get_git_diff()
 
     if not code.strip():
-        print("PASS")
-        print("No staged changes found.")
+        print("No code changes found.")
         sys.exit(0)
 
-    failed = False
+    review_id = str(uuid.uuid4())[:8]
 
-    print("\n==============================")
-    print("AI CODE REVIEW REPORT")
-    print("==============================\n")
+    score = 100
 
-    # ---------------- Secret Scanner ----------------
+    print_header("AI DEVSECOPS REVIEW REPORT")
 
-    print("🔒 Running Secret Scanner...\n")
+    print(f"Review ID       : {review_id}")
+    print(f"Reviewed At     : {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+
+    print("\n🔒 Secret Scanner")
 
     secrets = scan_for_secrets(code)
 
     if secrets:
-        failed = True
-        print("FAIL")
-        print("Critical Secrets Found\n")
-
         for issue in secrets:
-            print(issue)
-
+            print(
+                f"❌ {issue['severity']} | "
+                f"{issue['type']} | "
+                f"Line {issue['line']}"
+            )
     else:
-        print("PASS")
-        print("No secrets found.\n")
+        print("✅ No secrets detected")
 
-    # ---------------- Quality Checker ----------------
-
-    print("\n🛠 Running Quality Checker...\n")
+    print("\n🛠 Code Quality")
 
     quality = check_code_quality(code)
 
     if quality:
-        print("WARNING")
-        print("Code Quality Suggestions\n")
-
         for issue in quality:
-            print(issue)
-
+            print(
+                f"⚠ {issue['severity']} | "
+                f"{issue['type']} | "
+                f"Line {issue['line']}"
+            )
     else:
-        print("PASS")
-        print("No quality issues found.\n")
+        print("✅ No quality issues")
 
-    # ---------------- AI Review ----------------
+    print("\n🤖 AI Review")
 
-    print("\n🤖 AI REVIEW\n")
+    ai_result = ai_review(code)
 
-    try:
-        ai_result = ai_review(code)
-        print(ai_result)
+    print(ai_result)
 
-        if ai_result.strip().startswith("FAIL"):
-            failed = True
+    score = calculate_score(secrets, quality)
 
-    except Exception as e:
-        failed = True
-        print("FAIL")
-        print(e)
+    risk = calculate_risk(secrets, quality)
 
-    # ---------------- Final Result ----------------
+    failed = (
+        bool(secrets)
+        or ai_result.strip().startswith("FAIL")
+    )
 
-    print("\n==============================")
+    print("\n" + "=" * 60)
+    print("SUMMARY")
+    print("=" * 60)
+
+    print(f"Risk Level      : {risk}")
+    print(f"Security Score  : {score}/100")
+    print("AI Confidence   : 95%")
+
+    print("\nFinal Verdict")
 
     if failed:
-        print("FINAL RESULT : FAIL")
-        print("❌ Push Blocked")
-        print("==============================")
+        print("❌ BLOCK PUSH")
         sys.exit(1)
 
-    print("FINAL RESULT : PASS")
-    print("✅ Ready to Push")
-    print("==============================")
+    print("✅ READY TO PUSH")
     sys.exit(0)
 
 

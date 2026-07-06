@@ -11,6 +11,7 @@ def get_diff(base_branch: str = "origin/main") -> str:
     """
     Returns the git diff between the current branch and the base branch.
     """
+
     try:
         diff = subprocess.check_output(
             ["git", "diff", base_branch, "HEAD"],
@@ -27,7 +28,7 @@ def get_diff(base_branch: str = "origin/main") -> str:
 
 def build_prompt(diff: str) -> str:
     """
-    Builds the prompt sent to the AI.
+    Builds the AI review prompt.
     """
 
     instructions = """
@@ -47,11 +48,12 @@ Focus on:
 - Maintainability
 
 Ignore:
+
 - Formatting issues
 - Minor style differences
-- Missing comments unless they affect understanding
+- Missing comments
 
-------------------------------------------
+--------------------------------------------
 
 Return your response EXACTLY in this format.
 
@@ -69,8 +71,7 @@ FAIL
 
 ## Issue 1
 
-Severity:
-HIGH / MEDIUM / LOW
+Severity: HIGH / MEDIUM / LOW
 
 Problem:
 
@@ -78,17 +79,7 @@ Why it matters:
 
 Suggested Fix:
 
-## Issue 2
-
-Severity:
-
-Problem:
-
-Why it matters:
-
-Suggested Fix:
-
-------------------------------------------
+--------------------------------------------
 
 Git Diff:
 
@@ -99,13 +90,13 @@ Git Diff:
 
 def call_ai_model(prompt: str) -> str:
     """
-    Sends the prompt to OpenRouter.
+    Calls OpenRouter AI.
     """
 
     api_key = os.getenv("OPENROUTER_API_KEY")
 
     if not api_key:
-        return "FAIL\nOPENROUTER_API_KEY not found."
+        return "FAIL\n\nOPENROUTER_API_KEY not found."
 
     client = OpenAI(
         api_key=api_key,
@@ -116,15 +107,14 @@ def call_ai_model(prompt: str) -> str:
 
         response = client.chat.completions.create(
 
-            # Free Router (automatically picks an available free model)
             model="cohere/north-mini-code:free",
 
             messages=[
                 {
                     "role": "system",
                     "content": (
-                        "You are a strict but helpful Senior DevSecOps "
-                        "Engineer and Code Reviewer."
+                        "You are a strict Senior DevSecOps Engineer "
+                        "performing enterprise code reviews."
                     ),
                 },
                 {
@@ -142,7 +132,12 @@ def call_ai_model(prompt: str) -> str:
             },
         )
 
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+
+        if not content:
+            return "FAIL\n\nAI returned an empty response."
+
+        return content
 
     except Exception as e:
         return f"FAIL\n\nAI Review Error:\n{e}"
@@ -150,7 +145,7 @@ def call_ai_model(prompt: str) -> str:
 
 def ai_review(diff: str) -> str:
     """
-    Performs AI review.
+    Main function used by review_engine.py and FastAPI.
     """
 
     if not diff.strip():
@@ -162,6 +157,7 @@ def ai_review(diff: str) -> str:
 
 
 def main():
+
     diff = get_diff()
 
     if not diff.strip():
