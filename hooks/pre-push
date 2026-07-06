@@ -1,0 +1,18 @@
+#!/bin/bash
+
+echo ""
+echo "=================================="
+echo " AI PRE-PUSH CODE REVIEW"
+echo "=================================="
+
+python3 run_review.py
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "❌ Push Blocked"
+    exit 1
+fi
+
+echo ""
+echo "✅ Push Approved"
+exit 0

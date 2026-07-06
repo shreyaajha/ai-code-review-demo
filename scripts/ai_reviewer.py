@@ -1,71 +1,183 @@
 import os
 import subprocess
+
+from dotenv import load_dotenv
 from openai import OpenAI
+
+load_dotenv()
 
 
 def get_diff(base_branch: str = "origin/main") -> str:
+    """
+    Returns the git diff between the current branch and the base branch.
+    """
     try:
         diff = subprocess.check_output(
             ["git", "diff", base_branch, "HEAD"],
             stderr=subprocess.STDOUT,
         ).decode("utf-8")
+
         return diff
+
     except subprocess.CalledProcessError as e:
-        print("Error getting git diff:", e.output.decode("utf-8"))
+        print("Error getting git diff:")
+        print(e.output.decode("utf-8"))
         return ""
 
 
 def build_prompt(diff: str) -> str:
+    """
+    Builds the prompt sent to the AI.
+    """
+
     instructions = """
-You are a senior DevSecOps engineer and code reviewer.
+You are a Senior DevSecOps Engineer and Expert Code Reviewer.
 
-Review the following code diff for:
-- Security vulnerabilities (e.g., injection, insecure configs, secrets).
-- Code quality issues (readability, error handling, duplication).
-- DevSecOps best practices (logging, validation, least privilege).
+Review ONLY the provided Git diff.
 
-For each issue:
-- Quote the relevant code.
-- Explain why it is a problem.
-- Suggest a concrete fix.
+Focus on:
 
-If there are no changes, say that.
-Code diff:
+- Security vulnerabilities
+- Hardcoded secrets
+- Logic bugs
+- Performance issues
+- Poor coding practices
+- Missing exception handling
+- Input validation
+- Maintainability
+
+Ignore:
+
+- Formatting issues
+- Minor style differences
+- Missing comments
+
+------------------------------------------
+
+Return your response EXACTLY in this format.
+
+# Result
+
+PASS
+
+No major issues found.
+
+OR
+
+# Result
+
+FAIL
+
+## Issue 1
+
+Severity: HIGH / MEDIUM / LOW
+
+Problem:
+
+Why it matters:
+
+Suggested Fix:
+
+------------------------------------------
+
+Git Diff:
+
 """
-    return instructions + "\n" + diff
+
+    return instructions + diff
 
 
 def call_ai_model(prompt: str) -> str:
-    api_key = os.getenv("OPENAI_API_KEY")
+    """
+    Sends the prompt to OpenRouter.
+    """
+
+    api_key = os.getenv("OPENROUTER_API_KEY")
+
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set")
+        return "FAIL\n\nOPENROUTER_API_KEY not found."
 
-    client = OpenAI(api_key=api_key)
-
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "You are a strict but helpful code reviewer."},
-            {"role": "user", "content": prompt},
-        ],
-        max_tokens=1500,
-        temperature=0.2,
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1",
     )
-    return response.choices[0].message.content
+
+    try:
+
+        response = client.chat.completions.create(
+            model="cohere/north-mini-code:free",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a strict but helpful Senior DevSecOps "
+                        "Engineer and Code Reviewer."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            temperature=0.2,
+            max_tokens=1500,
+            extra_headers={
+                "HTTP-Referer": "https://github.com/shreyaajha/ai-code-review-demo",
+                "X-Title": "AI Code Reviewer",
+            },
+        )
+
+        message = response.choices[0].message
+
+        content = ""
+
+        if hasattr(message, "content") and message.content:
+            content = message.content
+
+        if isinstance(content, list):
+            content = "".join(
+                part.text if hasattr(part, "text") else str(part)
+                for part in content
+            )
+
+        content = str(content).strip()
+
+        if not content:
+            return "PASS\nNo major issues found."
+
+        return content
+
+    except Exception as e:
+        return f"FAIL\n\nAI Review Error:\n{e}"
+
+
+def ai_review(diff: str) -> str:
+    """
+    Performs AI review.
+    """
+
+    if not diff.strip():
+        return "PASS\nNo code changes detected."
+
+    prompt = build_prompt(diff)
+
+    return call_ai_model(prompt)
 
 
 def main():
     diff = get_diff()
+
     if not diff.strip():
-        print("No code changes detected. Nothing to review.")
+        print("No code changes detected.")
         return
 
-    prompt = build_prompt(diff)
-    review = call_ai_model(prompt)
+    print("\n==============================")
+    print("🤖 AI REVIEW")
+    print("==============================\n")
 
-    print("==== AI CODE REVIEW START ====")
+    review = ai_review(diff)
+
     print(review)
-    print("==== AI CODE REVIEW END ====")
 
 
 if __name__ == "__main__":
