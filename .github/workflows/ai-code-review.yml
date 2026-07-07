@@ -22,10 +22,147 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install requests
 
-      - name: Run AI Code Reviewer
-        env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      - name: Generate Git Diff
+        id: diff
         run: |
-          python run_review.py
+          git fetch origin main
+
+          git diff origin/main..HEAD > diff.txt
+
+      - name: Send Diff to AI Reviewer
+        run: |
+          python <<EOF
+          import json
+          import requests
+
+          with open("diff.txt","r") as f:
+              diff = f.read()
+
+          payload = {
+              "repository": "${{ github.repository }}",
+              "branch": "${{ github.ref_name }}",
+              "diff": diff
+          }
+
+          response = requests.post(
+              "https://ai-code-review-n1dt.onrender.com/review",
+              json=payload
+          )
+
+          review = response.json()
+
+          with open("review.json","w") as f:
+              json.dump(review,f,indent=4)
+
+          print("Review generated.")
+          EOF
+
+      - name: Generate HTML Report
+        run: |
+          python <<EOF
+          import json
+
+          with open("review.json") as f:
+              r=json.load(f)
+
+          html=f"""
+          <html>
+          <head>
+          <title>AI Code Review</title>
+
+          <style>
+
+          body {{
+              font-family: Arial;
+              background:#f5f5f5;
+              padding:40px;
+          }}
+
+          .card {{
+              background:white;
+              padding:30px;
+              border-radius:12px;
+              box-shadow:0 0 15px rgba(0,0,0,.1);
+          }}
+
+          h1 {{
+              color:#333;
+          }}
+
+          pre {{
+              background:#222;
+              color:#0f0;
+              padding:15px;
+              overflow:auto;
+          }}
+
+          table {{
+              width:100%;
+              border-collapse:collapse;
+          }}
+
+          td,th {{
+              border:1px solid #ddd;
+              padding:10px;
+          }}
+
+          </style>
+
+          </head>
+
+          <body>
+
+          <div class="card">
+
+          <h1>AI Code Review Report</h1>
+
+          <h2>Status : {r["status"]}</h2>
+
+          <table>
+
+          <tr>
+          <th>Critical</th>
+          <th>High</th>
+          <th>Medium</th>
+          <th>Low</th>
+          <th>Security Score</th>
+          </tr>
+
+          <tr>
+          <td>{r["summary"]["critical"]}</td>
+          <td>{r["summary"]["high"]}</td>
+          <td>{r["summary"]["medium"]}</td>
+          <td>{r["summary"]["low"]}</td>
+          <td>{r["summary"]["security_score"]}</td>
+          </tr>
+
+          </table>
+
+          <h2>Recommendations</h2>
+
+          <ul>
+
+          {''.join(f"<li>{x}</li>" for x in r["recommendations"])}
+
+          </ul>
+
+          <h2>AI Review</h2>
+
+          <pre>{r["ai_review"]}</pre>
+
+          </div>
+
+          </body>
+          </html>
+          """
+
+          open("report.html","w").write(html)
+          EOF
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Code-Review-Report
+          path: report.html
