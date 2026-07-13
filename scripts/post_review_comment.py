@@ -19,7 +19,6 @@ comment = f"""
 | Security Score | {review["summary"]["security_score"]}/100 |
 
 ## Recommendations
-
 """
 
 for r in review["recommendations"]:
@@ -36,7 +35,7 @@ pr_number = os.environ["PR_NUMBER"]
 
 url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
 
-requests.post(
+response = requests.post(
     url,
     headers={
         "Authorization": f"token {token}",
@@ -44,3 +43,8 @@ requests.post(
     },
     json={"body": comment},
 )
+
+print("GitHub API status:", response.status_code)
+print("GitHub API response:", response.text)
+
+response.raise_for_status()
