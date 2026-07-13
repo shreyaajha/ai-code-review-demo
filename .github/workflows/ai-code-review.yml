@@ -36,8 +36,9 @@ jobs:
           python <<EOF
           import json
           import requests
+          import sys
 
-          with open("diff.txt", "r") as f:
+          with open("diff.txt","r") as f:
               diff = f.read()
 
           payload = {
@@ -53,13 +54,20 @@ jobs:
 
           review = response.json()
 
-          with open("review.json", "w") as f:
-              json.dump(review, f, indent=4)
+          with open("review.json","w") as f:
+              json.dump(review,f,indent=4)
 
           print("Review generated.")
+          print("Status:", review["status"])
+
+          if review["status"] == "FAIL":
+              print("Critical issues found.")
+              sys.exit(1)
+
           EOF
 
       - name: Generate HTML Report
+        if: always()
         run: |
           python <<EOF
           import json
@@ -156,15 +164,34 @@ jobs:
           EOF
 
       - name: Upload Report
+        if: always()      
         uses: actions/upload-artifact@v4
         with:
           name: AI-Code-Review-Report
           path: report.html
 
       - name: Post Review Comment
+        if: always()
         if: github.event_name == 'pull_request'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           python scripts/post_review_comment.py
+
+                - name: Fail Workflow If Review Failed
+        if: always()
+        run: |
+          python <<EOF
+          import json
+          import sys
+
+          with open("review.json") as f:
+              review = json.load(f)
+
+          if review["status"] == "FAIL":
+              print("Blocking merge because review failed.")
+              sys.exit(1)
+
+          print("Review passed.")
+          EOF
