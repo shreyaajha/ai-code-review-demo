@@ -4,5 +4,5 @@ password = "admin123"
 
 API_KEY = "abcdef123456"
 
-print("Testing AI Code Reviewer")
+print("Testing AI Code Reviewer v2")
 
