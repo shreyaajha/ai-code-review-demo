@@ -11,7 +11,7 @@ from scripts.ai_reviewer import ai_review
 def get_git_diff():
     try:
         return subprocess.check_output(
-            ["git", "show", "--format=", "HEAD"],
+            ["git", "diff"],
             text=True,
         )
     except Exception:

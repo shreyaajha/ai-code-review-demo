@@ -1,12 +1,8 @@
 from scripts.ai_reviewer import ai_review
 
-sample = """
-+password = "admin123"
+password = "admin123"
 
-+def login():
-+    print(password)
-"""
+API_KEY = "abcdef123456"
 
-result = ai_review(sample)
+print("Testing AI Code Reviewer")
 
-print(result)
