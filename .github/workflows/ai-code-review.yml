@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+        fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -29,7 +31,7 @@ jobs:
 
       - name: Generate Git Diff
         run: |
-           git diff HEAD~1 HEAD > diff.txt
+         git diff HEAD~1 HEAD > diff.txt
 
       - name: Send Diff to AI Reviewer
         run: |
