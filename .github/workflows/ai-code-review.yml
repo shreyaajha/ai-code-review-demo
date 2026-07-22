@@ -1,18 +1,23 @@
 name: AI Code Review
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 on:
   pull_request:
   push:
 
 jobs:
   review:
-
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -25,11 +30,9 @@ jobs:
           pip install requests
 
       - name: Generate Git Diff
-        id: diff
         run: |
           git fetch origin main
-
-          git diff origin/main..HEAD > diff.txt
+          git diff origin/main...HEAD > diff.txt
 
       - name: Send Diff to AI Reviewer
         run: |
@@ -37,7 +40,7 @@ jobs:
           import json
           import requests
 
-          with open("diff.txt","r") as f:
+          with open("diff.txt", "r") as f:
               diff = f.read()
 
           payload = {
@@ -48,72 +51,70 @@ jobs:
 
           response = requests.post(
               "https://ai-code-review-n1dt.onrender.com/review",
-              json=payload
+              json=payload,
+              timeout=120
           )
+
+          response.raise_for_status()
 
           review = response.json()
 
-          with open("review.json","w") as f:
-              json.dump(review,f,indent=4)
+          print(json.dumps(review, indent=2))
+
+          with open("review.json", "w") as f:
+              json.dump(review, f, indent=4)
 
           print("Review generated.")
+          print("Status:", review["status"])
           EOF
 
       - name: Generate HTML Report
+        if: always()
         run: |
           python <<EOF
           import json
 
           with open("review.json") as f:
-              r=json.load(f)
+              r = json.load(f)
 
-          html=f"""
+          html = f"""
           <html>
           <head>
           <title>AI Code Review</title>
-
           <style>
-
           body {{
               font-family: Arial;
-              background:#f5f5f5;
-              padding:40px;
+              background: #f5f5f5;
+              padding: 40px;
           }}
 
           .card {{
-              background:white;
-              padding:30px;
-              border-radius:12px;
-              box-shadow:0 0 15px rgba(0,0,0,.1);
-          }}
-
-          h1 {{
-              color:#333;
+              background: white;
+              padding: 30px;
+              border-radius: 12px;
+              box-shadow: 0 0 15px rgba(0,0,0,.1);
           }}
 
           pre {{
-              background:#222;
-              color:#0f0;
-              padding:15px;
-              overflow:auto;
+              background: #222;
+              color: #0f0;
+              padding: 15px;
+              overflow: auto;
           }}
 
           table {{
-              width:100%;
-              border-collapse:collapse;
+              width: 100%;
+              border-collapse: collapse;
           }}
 
-          td,th {{
-              border:1px solid #ddd;
-              padding:10px;
+          td, th {{
+              border: 1px solid #ddd;
+              padding: 10px;
           }}
-
           </style>
-
           </head>
 
           <body>
-
           <div class="card">
 
           <h1>AI Code Review Report</h1>
@@ -121,31 +122,27 @@ jobs:
           <h2>Status : {r["status"]}</h2>
 
           <table>
-
           <tr>
-          <th>Critical</th>
-          <th>High</th>
-          <th>Medium</th>
-          <th>Low</th>
-          <th>Security Score</th>
+              <th>Critical</th>
+              <th>High</th>
+              <th>Medium</th>
+              <th>Low</th>
+              <th>Security Score</th>
           </tr>
 
           <tr>
-          <td>{r["summary"]["critical"]}</td>
-          <td>{r["summary"]["high"]}</td>
-          <td>{r["summary"]["medium"]}</td>
-          <td>{r["summary"]["low"]}</td>
-          <td>{r["summary"]["security_score"]}</td>
+              <td>{r["summary"]["critical"]}</td>
+              <td>{r["summary"]["high"]}</td>
+              <td>{r["summary"]["medium"]}</td>
+              <td>{r["summary"]["low"]}</td>
+              <td>{r["summary"]["security_score"]}</td>
           </tr>
-
           </table>
 
           <h2>Recommendations</h2>
 
           <ul>
-
           {''.join(f"<li>{x}</li>" for x in r["recommendations"])}
-
           </ul>
 
           <h2>AI Review</h2>
@@ -153,16 +150,42 @@ jobs:
           <pre>{r["ai_review"]}</pre>
 
           </div>
-
           </body>
           </html>
           """
 
-          open("report.html","w").write(html)
+          with open("report.html", "w") as f:
+              f.write(html)
           EOF
 
       - name: Upload Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: AI-Code-Review-Report
           path: report.html
+
+      - name: Post Review Comment
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python scripts/post_review_comment.py
+
+      - name: Fail Workflow If Review Failed
+        if: always()
+        run: |
+          python <<EOF
+          import json
+          import sys
+
+          with open("review.json") as f:
+              review = json.load(f)
+
+          if review["status"] == "FAIL":
+              print("Blocking merge because review failed.")
+              sys.exit(1)
+
+          print("Review passed.")
+          EOF
