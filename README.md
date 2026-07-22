@@ -269,7 +269,7 @@ Create a `.env` file in the project root.
 Example:
 
 ```text
-OPENROUTER_API_KEY=your_openrouter_api_key
+OPENROUTER_API_KEY=<your_api_key_here>
 ```
 
 The AI Reviewer uses this API key to communicate with the OpenRouter LLM.
@@ -423,7 +423,7 @@ The following example contains intentionally insecure code.
 
 ```python
 USERNAME = "<example>"
-TOKEN = "<redacted>"
+TOKEN = os.getenv("TOKEN")
 ```
 
 Commit the changes:

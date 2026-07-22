@@ -1,8 +1,4 @@
-from scripts.ai_reviewer import ai_review
+import os
 
-password = "admin123"
-
-API_KEY = "abcdef123456"
-
-print("Testing AI Code Reviewer v2")
-
+password = os.getenv("PASSWORD")
+API_KEY = os.getenv("API_KEY")
