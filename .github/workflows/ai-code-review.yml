@@ -53,6 +53,7 @@ jobs:
           )
 
           review = response.json()
+          print(json.dumps(review, indent=2))
 
           with open("review.json", "w") as f:
               json.dump(review, f, indent=4)
