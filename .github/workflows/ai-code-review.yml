@@ -17,7 +17,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-        fetch-depth: 0
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -31,7 +31,8 @@ jobs:
 
       - name: Generate Git Diff
         run: |
-         git diff HEAD~1 HEAD > diff.txt
+          git fetch --all
+          git diff HEAD~1 HEAD > diff.txt
 
       - name: Send Diff to AI Reviewer
         run: |
@@ -50,10 +51,14 @@ jobs:
 
           response = requests.post(
               "https://ai-code-review-n1dt.onrender.com/review",
-              json=payload
+              json=payload,
+              timeout=120
           )
 
+          response.raise_for_status()
+
           review = response.json()
+
           print(json.dumps(review, indent=2))
 
           with open("review.json", "w") as f:
@@ -149,7 +154,8 @@ jobs:
           </html>
           """
 
-          open("report.html", "w").write(html)
+          with open("report.html", "w") as f:
+              f.write(html)
           EOF
 
       - name: Upload Report
