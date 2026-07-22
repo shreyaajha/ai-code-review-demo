@@ -1,12 +1,4 @@
-from scripts.ai_reviewer import ai_review
+import os
 
-sample = """
-+password = "admin123"
-
-+def login():
-+    print(password)
-"""
-
-result = ai_review(sample)
-
-print(result)
+password = os.getenv("PASSWORD")
+API_KEY = os.getenv("API_KEY")

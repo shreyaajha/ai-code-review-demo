@@ -1,43 +1,21 @@
-name: AI Code Review
-
-on:
-  pull_request:
-  push:
-
-jobs:
-  review:
-
-    runs-on: ubuntu-latest
-
-    steps:
-
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
-
-      - name: Generate Git Diff
-        id: diff
+- name: Generate Git Diff
         run: |
           git fetch origin main
-
-          git diff origin/main..HEAD > diff.txt
+          git diff origin/main...HEAD > diff.txt
+          if [ -s diff.txt ]; then
+            echo "HAS_CHANGES=true" >> $GITHUB_ENV
+          else
+            echo "HAS_CHANGES=false" >> $GITHUB_ENV
+          fi
 
       - name: Send Diff to AI Reviewer
+        if: env.HAS_CHANGES == 'true'
         run: |
           python <<EOF
           import json
           import requests
 
-          with open("diff.txt","r") as f:
+          with open("diff.txt", "r") as f:
               diff = f.read()
 
           payload = {
@@ -48,121 +26,25 @@ jobs:
 
           response = requests.post(
               "https://ai-code-review-n1dt.onrender.com/review",
-              json=payload
+              json=payload,
+              timeout=120
           )
+
+          response.raise_for_status()
 
           review = response.json()
 
-          with open("review.json","w") as f:
-              json.dump(review,f,indent=4)
+          print(json.dumps(review, indent=2))
+
+          with open("review.json", "w") as f:
+              json.dump(review, f, indent=4)
 
           print("Review generated.")
+          print("Status:", review["status"])
           EOF
 
-      - name: Generate HTML Report
+      - name: Skip Review (No Changes)
+        if: env.HAS_CHANGES == 'false'
         run: |
-          python <<EOF
-          import json
-
-          with open("review.json") as f:
-              r=json.load(f)
-
-          html=f"""
-          <html>
-          <head>
-          <title>AI Code Review</title>
-
-          <style>
-
-          body {{
-              font-family: Arial;
-              background:#f5f5f5;
-              padding:40px;
-          }}
-
-          .card {{
-              background:white;
-              padding:30px;
-              border-radius:12px;
-              box-shadow:0 0 15px rgba(0,0,0,.1);
-          }}
-
-          h1 {{
-              color:#333;
-          }}
-
-          pre {{
-              background:#222;
-              color:#0f0;
-              padding:15px;
-              overflow:auto;
-          }}
-
-          table {{
-              width:100%;
-              border-collapse:collapse;
-          }}
-
-          td,th {{
-              border:1px solid #ddd;
-              padding:10px;
-          }}
-
-          </style>
-
-          </head>
-
-          <body>
-
-          <div class="card">
-
-          <h1>AI Code Review Report</h1>
-
-          <h2>Status : {r["status"]}</h2>
-
-          <table>
-
-          <tr>
-          <th>Critical</th>
-          <th>High</th>
-          <th>Medium</th>
-          <th>Low</th>
-          <th>Security Score</th>
-          </tr>
-
-          <tr>
-          <td>{r["summary"]["critical"]}</td>
-          <td>{r["summary"]["high"]}</td>
-          <td>{r["summary"]["medium"]}</td>
-          <td>{r["summary"]["low"]}</td>
-          <td>{r["summary"]["security_score"]}</td>
-          </tr>
-
-          </table>
-
-          <h2>Recommendations</h2>
-
-          <ul>
-
-          {''.join(f"<li>{x}</li>" for x in r["recommendations"])}
-
-          </ul>
-
-          <h2>AI Review</h2>
-
-          <pre>{r["ai_review"]}</pre>
-
-          </div>
-
-          </body>
-          </html>
-          """
-
-          open("report.html","w").write(html)
-          EOF
-
-      - name: Upload Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: AI-Code-Review-Report
-          path: report.html
+          echo '{"status": "PASS", "summary": {"critical":0,"high":0,"medium":0,"low":0,"security_score":100}, "recommendations": [], "ai_review": "No changes to review."}' > review.json
+          echo "No diff vs main — skipping AI review."

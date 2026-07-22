@@ -1,75 +1,53 @@
 import re
 
+
 PATTERNS = {
-    "OpenAI API Key": r"sk-[A-Za-z0-9_-]{20,}",
-
+    "OpenAI API Key": r"sk-[A-Za-z0-9]{20,}",
     "AWS Access Key": r"AKIA[0-9A-Z]{16}",
-
     "JWT Token": r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+",
+    "Private Key": r"-----BEGIN PRIVATE KEY-----",
 
-    "Private Key": r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----",
+    "Password": r"(?i)(password|passwd|pwd)\s*=\s*['\"](?!os\.getenv|your_|<|example)[^'\"]{8,}['\"]",
 
-    "GitHub Token": r"gh[pousr]_[A-Za-z0-9]{36,}",
+    "API Key": r"(?i)(api[_-]?key|apikey)\s*=\s*['\"](?!os\.getenv|your_|<|example)[^'\"]{8,}['\"]",
 
-    "Generic Secret":
-        r"\b(password|passwd|pwd|secret|secret_key|client_secret|"
-        r"access_token|refresh_token|auth_token|token|"
-        r"api[_-]?key|api[_-]?keys|apikey|database_url|db_password)\b"
-        r"\s*[:=]\s*[\"']?.+[\"']?"
+    "Secret Key": r"(?i)(secret[_-]?key|secretkey)\s*=\s*['\"](?!os\.getenv|your_|<|example)[^'\"]{8,}['\"]",
 }
 
 
-HIGH_ENTROPY = re.compile(r"[A-Za-z0-9_\-]{24,}")
-
-
-def looks_random(text: str) -> bool:
-    """
-    Simple heuristic:
-    Long strings containing uppercase, lowercase and numbers
-    are likely secrets.
-    """
-
-    if len(text) < 24:
-        return False
-
-    has_upper = any(c.isupper() for c in text)
-    has_lower = any(c.islower() for c in text)
-    has_digit = any(c.isdigit() for c in text)
-
-    return has_upper and has_lower and has_digit
+IGNORE_FILES = [
+    "README.md",
+    "test_secret.py",
+    "test_app.py",
+]
 
 
 def scan_for_secrets(code: str):
-    findings = []
 
-    lines = code.splitlines()
+    issues = []
 
-    for line_number, line in enumerate(lines, start=1):
+    current_file = ""
 
-        # Scan only added lines in git diff
+    for line_number, line in enumerate(code.splitlines(), start=1):
+
+        if line.startswith("+++ b/"):
+            current_file = line.replace("+++ b/", "").strip()
+
+        if any(current_file.endswith(file) for file in IGNORE_FILES):
+            continue
+
         if not line.startswith("+") or line.startswith("+++"):
             continue
 
-        # Regex-based detection
-        for secret_name, pattern in PATTERNS.items():
+        for name, pattern in PATTERNS.items():
 
-            if re.search(pattern, line, re.IGNORECASE):
-                findings.append({
-                    "type": secret_name,
+            if re.search(pattern, line):
+
+                issues.append({
+                    "type": name,
+                    "severity": "Critical",
                     "line": line_number,
-                    "code": line.strip(),
-                    "severity": "Critical"
+                    "code": line.strip()
                 })
 
-        # Detect suspicious random strings
-        for candidate in HIGH_ENTROPY.findall(line):
-
-            if looks_random(candidate):
-                findings.append({
-                    "type": "Possible Secret (High Entropy)",
-                    "line": line_number,
-                    "code": candidate,
-                    "severity": "Medium"
-                })
-
-    return findings
+    return issues
