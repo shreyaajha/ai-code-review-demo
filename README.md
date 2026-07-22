@@ -1,4 +1,4 @@
-# 🤖 AI DevSecOps Code Review Pipeline
+# 🤖 AI DevSecOps Code Reviewer
 
 <p align="center">
 
@@ -201,6 +201,24 @@ ai-code-review-demo/
 | Reports | HTML & JSON |
 | Deployment | Render |
 | Containerization | Docker |
+
+---
+
+# 📸 Demo
+
+### FastAPI Review API
+
+The FastAPI backend exposes the AI review engine through a REST API with interactive Swagger documentation.
+
+![FastAPI Docs](images/fastapi-docs.png)
+
+---
+
+### GitHub Pull Request Review
+
+When a Pull Request is created or updated, GitHub Actions automatically performs an AI-powered review and posts a review summary directly on the Pull Request.
+
+![AI Review Report](images/pr-review.png)
 
 ---
 
@@ -509,4 +527,56 @@ The project automatically generates the following outputs after each review.
 These reports help developers quickly understand issues and take corrective actions.
 
 ---
-Project demo update.
+
+## 🔄 Project Workflow
+
+```text
+Developer
+    │
+    ▼
+Git Commit & Push
+    │
+    ▼
+Git Pre-Push Hook (Local)
+    │
+    ▼
+Secret Scanner
+    │
+    ▼
+Code Quality Checker
+    │
+    ▼
+AI Reviewer
+    │
+    ▼
+Allow / Block Push
+    │
+    ▼
+GitHub Actions
+    │
+    ▼
+Generate PR Review
+    │
+    ▼
+Post AI Review Comment
+```
+---
+
+## 🚀 Future Improvements
+
+- Support multiple AI models
+- Detect more security vulnerabilities
+- Generate inline code review comments
+- Slack and Microsoft Teams notifications
+- SonarQube integration
+- Docker deployment
+
+---
+
+## 👩‍💻 Author
+
+**Shreya Jha**
+
+B.Tech Computer Science (Cloud & DevOps)
+
+---
