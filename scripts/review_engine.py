@@ -11,7 +11,7 @@ from scripts.ai_reviewer import ai_review
 def get_git_diff():
     try:
         return subprocess.check_output(
-            ["git", "diff", "HEAD~1", "HEAD"],
+            ["git", "diff", "HEAD"],
             text=True,
         )
     except Exception:
@@ -67,8 +67,6 @@ def run_review():
 
     review_id = str(uuid.uuid4())[:8]
 
-    score = 100
-
     print_header("AI DEVSECOPS REVIEW REPORT")
 
     print(f"Review ID       : {review_id}")
@@ -88,6 +86,7 @@ def run_review():
     else:
         print("✅ No secrets detected")
 
+
     print("\n🛠 Code Quality")
 
     quality = check_code_quality(code)
@@ -102,20 +101,24 @@ def run_review():
     else:
         print("✅ No quality issues")
 
+
     print("\n🤖 AI Review")
 
     ai_result = ai_review(code)
 
     print(ai_result)
 
+
     score = calculate_score(secrets, quality)
 
     risk = calculate_risk(secrets, quality)
+
 
     failed = (
         bool(secrets)
         or ai_result.strip().startswith("FAIL")
     )
+
 
     print("\n" + "=" * 60)
     print("SUMMARY")
@@ -124,6 +127,7 @@ def run_review():
     print(f"Risk Level      : {risk}")
     print(f"Security Score  : {score}/100")
     print("AI Confidence   : 95%")
+
 
     print("\nFinal Verdict")
 
