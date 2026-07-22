@@ -1,5 +1,4 @@
 import re
-import os
 
 
 PATTERNS = {
@@ -7,9 +6,12 @@ PATTERNS = {
     "AWS Access Key": r"AKIA[0-9A-Z]{16}",
     "JWT Token": r"eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+",
     "Private Key": r"-----BEGIN PRIVATE KEY-----",
-    "Password": r"(?i)(password|passwd|pwd)\s*=\s*['\"][^'\"]{8,}['\"]",
-    "API Key": r"(?i)(api[_-]?key|apikey)\s*=\s*['\"][^'\"]{8,}['\"]",
-    "Secret Key": r"(?i)(secret[_-]?key|secretkey)\s*=\s*['\"][^'\"]{8,}['\"]",
+
+    "Password": r"(?i)(password|passwd|pwd)\s*=\s*['\"](?!os\.getenv|your_|<|example)[^'\"]{8,}['\"]",
+
+    "API Key": r"(?i)(api[_-]?key|apikey)\s*=\s*['\"](?!os\.getenv|your_|<|example)[^'\"]{8,}['\"]",
+
+    "Secret Key": r"(?i)(secret[_-]?key|secretkey)\s*=\s*['\"](?!os\.getenv|your_|<|example)[^'\"]{8,}['\"]",
 }
 
 
@@ -28,18 +30,14 @@ def scan_for_secrets(code: str):
 
     for line_number, line in enumerate(code.splitlines(), start=1):
 
-        # detect filename from git diff
         if line.startswith("+++ b/"):
             current_file = line.replace("+++ b/", "").strip()
 
-        # ignore documentation/tests
         if any(current_file.endswith(file) for file in IGNORE_FILES):
             continue
 
-
         if not line.startswith("+") or line.startswith("+++"):
             continue
-
 
         for name, pattern in PATTERNS.items():
 
@@ -47,10 +45,9 @@ def scan_for_secrets(code: str):
 
                 issues.append({
                     "type": name,
-                    "severity": "HIGH",
+                    "severity": "Critical",
                     "line": line_number,
                     "code": line.strip()
                 })
-
 
     return issues
