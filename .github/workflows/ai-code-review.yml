@@ -31,8 +31,8 @@ jobs:
 
       - name: Generate Git Diff
         run: |
-          git fetch --all
-          git diff HEAD~1 HEAD > diff.txt
+          git fetch origin main
+          git diff origin/main...HEAD > diff.txt
 
       - name: Send Diff to AI Reviewer
         run: |
