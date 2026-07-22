@@ -1,5 +1,4 @@
-# Demonstration of case-insensitive secret detection
-
+# PR reviewer test
 
 def add_numbers(a, b):
     return a + b
