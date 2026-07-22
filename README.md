@@ -422,10 +422,11 @@ This helps developers fix problems before the code reaches the remote repository
 The following example contains intentionally insecure code.
 
 ```python
-password = "admin123"
 
-API_KEY = "abcdef123456"
+USERNAME = "<example>"
 
+TOKEN = "<redacted>"
+```
 print("Testing AI Code Reviewer")
 ```
 
