@@ -27,8 +27,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests
 
-      - - name: Generate Git Diff
-          run: |
+      - name: Generate Git Diff
+        run: |
            git diff HEAD~1 HEAD > diff.txt
 
       - name: Send Diff to AI Reviewer
